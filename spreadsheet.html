@@ -1,73 +1,124 @@
-<script src="lib/angular.js"></script>
+<html>
+  <head>
+    <style>
+      body { font-family: sans-serif; }
+      .output, input { 
+        font-size: 10pt;
+        position: absolute;
+        height: 1.2em;
+        width: 50pt;
+        height: 16pt;
+        overflow: hidden;
+        padding-left: 4pt;
+      }
+      input { border: none;}
+      .output { 
+        background: white; 
+        pointer-events: none;
+        padding-top: 2pt;
+        height: 14pt;
+      }
+      input:focus + .output { display: none; }
 
-<script>
-  sheet = function($scope, $parse) {
-    $scope.columns = ['A', 'B', 'C', 'D'];
-    $scope.rows = [1, 2, 3, 4];
-    $scope.cells = {};
-    
-    process = function(exp) {
-      return exp.replace(/[A-Z]\d+/, function(ref) {
-        return 'compute("' + ref + '")';
-      })
-    }
-    $scope.compute = function(cell) {
-      return $parse(process($scope.cells[cell]))($scope);
-    };
-  }
-</script>
+      table { border-collapse: collapse; } 
+      td > div {
+        width: 55pt;
+        height: 16pt;
+      } 
+      td { border: 1px solid #EEE; }
+      .column-label  > td, .row-label {
+        text-align: center;
+        background: #EEE;
+      }
+      .row-label { width: 2em; }
 
-<div ng-app ng-controller="sheet">
-  <table>
-    <tr class="column-label">
-      <td></td>
-      <td ng-repeat="column in columns">{{column}}</td>
-    </tr>
-    <tr ng-repeat="row in rows">
-      <td class="row-label">{{row}}</td>
-      <td ng-repeat="column in columns">
-        <div>
-          <input ng-model="cells[column+row]"></input>
-          <div ng-bind="compute(column+row)"
-               class="output"></div>
-        </div>
-      </td>
-    </tr>
-  </table>
-</div>
+    </style>
+  </head>
+  <body >
 
-<style>
-  body { font-family: sans-serif; }
-  .output, input { 
-    font-size: 10pt;
-    position: absolute;
-    height: 1.2em;
-    width: 50pt;
-    height: 16pt;
-    overflow: hidden;
-    padding-left: 4pt;
-  }
-  input { border: none;}
-  .output { 
-    background: white; 
-    pointer-events: none;
-    padding-top: 2pt;
-    height: 14pt;
-  }
-  input:focus + .output { display: none; }
- 
-  table { border-collapse: collapse; } 
-  td > div {
-    width: 55pt;
-    height: 16pt;
-  } 
-  td { border: 1px solid #EEE; }
-  .column-label  > td, .row-label {
-    text-align: center;
-    background: #EEE;
-  }
-  .row-label { width: 2em; }
- 
-</style>
+    <div ng-app="myApp" ng-controller="myController">
+      <table>
+        <tr class="column-label">
+          <td></td>
+          <td ng-repeat="col in columns">{{col}}</td>
+        </tr>
+        <tr ng-repeat="row in rows">
+          <td class="row-label">{{row}}</td>
+          <td ng-repeat="col in columns">
+            <div>
+              <input ng-model="_cell(col,row).value" ng-model-options="{ getterSetter: true }" />
+              <div ng-bind="_compute(col,row)"
+                   class="output"></div>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.5/angular.js" ></script>
+    <script>
+      angular.module('myApp', [])
+        .controller('myController', [ '$scope', '$parse', function($scope, $parse) {
+            function cell(val) {
+              this._value = val;
+              if (!this.value) {
+                this.value = function(newValue) {
+                  if (!angular.isUndefined(newValue))
+                    this._value = newValue;
+                  return this._value;
+                };
+              }                
+            };
+            
+            $scope.columns = ['A', 'B', 'C', 'D'];
+            $scope.rows = [1, 2, 3, 4];
+            $scope.colmap = {};
+            $scope.rowmap = {};
+            $scope.cells = [];
+            $scope.bindings = [];
+            for(var col in $scope.columns) {
+              var _col = [];              
+              $scope.colmap[$scope.columns[col]] = $scope.cells.push(_col)-1;
+              for(var row in $scope.rows) {
+                var _row = _col.push(new cell(''));
+                if ($scope.cells.length === 1)
+                  $scope.rowmap[$scope.rows[row]] = _row-1;
+              }
+            }
 
+            process = function(exp) {
+              return exp.replace(/([A-Z])(\d+)/g, function(ref,col,row) {
+                return 'compute("' + col + '","' + row + '")';
+              });
+            };
+
+            $scope._cell = function(col,row) {
+              var _col = $scope.colmap[col];
+              var _row = $scope.rowmap[row];
+              var _cell = $scope.cells[_col][_row];
+              return _cell;
+            };
+            
+            $scope._compute = function(col,row) {
+              return $scope.compute(col,row);
+            };
+            
+            $scope.compute = function(col,row) {
+              var _col = $scope.colmap[col];
+              var _row = $scope.rowmap[row];
+              var _val = $scope.cells[_col][_row]._value;
+              if (angular.isUndefined(_val))
+                return _val;
+              else {
+                var _process = process(_val);
+                var _parse = $parse(_process)($scope);
+                if (angular.isUndefined(_parse))
+                  return _process;
+                else
+                  return _parse;
+              }
+            };
+          } ] );
+    </script>
+  </body>
+</html>
 
